@@ -39,6 +39,12 @@ const Dashboard = () => {
       return;
     }
 
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Please log in to upload files');
+      return;
+    }
+
     const formData = new FormData();
     formData.append('file', file);
 
@@ -49,6 +55,7 @@ const Dashboard = () => {
       const response = await axios.post('http://localhost:5000/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
         },
       });
       
@@ -72,13 +79,24 @@ const Dashboard = () => {
       return;
     }
 
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Please log in to generate study guides');
+      return;
+    }
+
     try {
       setLoading(true);
       setError('');
       setSuccess('');
-      const response = await axios.post('http://localhost:5000/generate', {
-        topic: topic,
-      });
+      const response = await axios.post('http://localhost:5000/generate', 
+        { topic: topic },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
       
       if (response.data.study_guide) {
         setStudyGuide(response.data.study_guide);
@@ -104,11 +122,12 @@ const Dashboard = () => {
           flexGrow: 1,
           p: 3,
           width: '100%',
-          marginTop: '64px', // Add margin to account for the hamburger menu
+          minHeight: '100vh',
+          backgroundColor: '#f5f5f5'
         }}
       >
         <Container maxWidth="md">
-          <Paper elevation={3} sx={{ p: 4 }}>
+          <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
             <Typography variant="h4" gutterBottom>
               Study Guide Generator
             </Typography>
@@ -185,14 +204,16 @@ const Dashboard = () => {
               </Box>
             )}
 
-            {/* Study Guide Display */}
+            {/* Study Guide Output */}
             {studyGuide && (
               <Box sx={{ mt: 4 }}>
                 <Typography variant="h6" gutterBottom>
                   Generated Study Guide
                 </Typography>
-                <Paper elevation={1} sx={{ p: 2, whiteSpace: 'pre-wrap' }}>
-                  {studyGuide}
+                <Paper elevation={1} sx={{ p: 2, backgroundColor: '#fff' }}>
+                  <Typography variant="body1" style={{ whiteSpace: 'pre-wrap' }}>
+                    {studyGuide}
+                  </Typography>
                 </Paper>
               </Box>
             )}

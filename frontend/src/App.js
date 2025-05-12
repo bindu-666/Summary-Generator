@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
-import Navbar from './components/Navbar';
 
 const App = () => {
   const isAuthenticated = () => {
@@ -16,7 +15,6 @@ const App = () => {
 
   return (
     <Router>
-      <Navbar />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />

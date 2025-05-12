@@ -16,7 +16,7 @@ import { API_ENDPOINTS } from '../config';
 const Signup = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    name: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -33,8 +33,8 @@ const Signup = () => {
   };
 
   const validateForm = () => {
-    if (!formData.name.trim()) {
-      setError('Name is required');
+    if (!formData.username.trim()) {
+      setError('Username is required');
       return false;
     }
     if (!formData.email.trim()) {
@@ -70,13 +70,13 @@ const Signup = () => {
     try {
       setLoading(true);
       console.log('Sending signup request with data:', {
-        name: formData.name,
+        username: formData.username,
         email: formData.email,
         password: formData.password,
       });
 
-      const response = await axios.post(API_ENDPOINTS.AUTH.SIGNUP, {
-        name: formData.name,
+      const response = await axios.post('http://localhost:5000/api/auth/signup', {
+        username: formData.username,
         email: formData.email,
         password: formData.password,
       });
@@ -94,7 +94,7 @@ const Signup = () => {
       if (err.response) {
         // The request was made and the server responded with a status code
         // that falls out of the range of 2xx
-        setError(err.response.data.message || 'Server error occurred');
+        setError(err.response.data.error || 'Server error occurred');
       } else if (err.request) {
         // The request was made but no response was received
         setError('No response from server. Please check if the backend is running.');
@@ -131,12 +131,12 @@ const Signup = () => {
               margin="normal"
               required
               fullWidth
-              id="name"
-              label="Full Name"
-              name="name"
-              autoComplete="name"
+              id="username"
+              label="Username"
+              name="username"
+              autoComplete="username"
               autoFocus
-              value={formData.name}
+              value={formData.username}
               onChange={handleChange}
               disabled={loading}
             />
