@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Guide Creator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        form {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        input[type="file"],
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        hr {
+            margin: 30px 0;
+            border: 0;
+            border-top: 1px solid #ddd;
+        }
+        #study-guide {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+    </style>
+</head>
+<body>
+    <h1>Study Guide Creator</h1>
+
+    {% if message %}
+    <div class="message success">{{ message }}</div>
+    {% endif %}
+
+    {% if error %}
+    <div class="message error">{{ error }}</div>
+    {% endif %}
+
+    <!-- File Upload Form -->
+    <form action="/upload" method="POST" enctype="multipart/form-data">
+        <label for="file">Upload your study material (PDF, DOCX, or TXT):</label>
+        <input type="file" name="file" id="file" accept=".pdf,.docx,.txt" required>
+        <button type="submit">Upload</button>
+    </form>
+
+    <hr>
+
+    <!-- Topic Input Form -->
+    <form action="/generate" method="POST">
+        <label for="topic">Enter the topic for your study guide:</label>
+        <input type="text" name="topic" id="topic" required>
+        <button type="submit">Generate Study Guide</button>
+    </form>
+
+    {% if study_guide %}
+        <h2>Your Generated Study Guide:</h2>
+        <div id="study-guide" style="white-space: pre-wrap; background-color: #f9f9f9; padding: 20px; border-radius: 5px; margin-top: 20px;">
+            {{ study_guide | safe }}
+        </div>
+    {% endif %}
+</body>
+</html> 
