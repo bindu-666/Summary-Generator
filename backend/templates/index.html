@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Study Guide Creator</title>
+    <title>Summary Creator</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -51,7 +51,7 @@
             border: 0;
             border-top: 1px solid #ddd;
         }
-        #study-guide {
+        #summary {
             background-color: #f9f9f9;
             padding: 20px;
             border-radius: 5px;
@@ -70,22 +70,69 @@
             background-color: #f2dede;
             color: #a94442;
         }
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
     </style>
+    <script>
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            showLoading();
+            
+            const formData = new FormData(event.target);
+            const topic = formData.get('topic');
+            
+            fetch('/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + localStorage.getItem('token')
+                },
+                body: JSON.stringify({ topic: topic })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.error) {
+                    document.getElementById('error').textContent = data.error;
+                    document.getElementById('error').style.display = 'block';
+                    document.getElementById('success').style.display = 'none';
+                } else {
+                    document.getElementById('summary-content').textContent = data.summary;
+                    document.getElementById('summary-section').style.display = 'block';
+                    document.getElementById('error').style.display = 'none';
+                    document.getElementById('success').style.display = 'block';
+                    document.getElementById('success').textContent = data.message;
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                document.getElementById('error').textContent = 'An error occurred. Please try again.';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('success').style.display = 'none';
+            });
+        }
+    </script>
 </head>
 <body>
-    <h1>Study Guide Creator</h1>
+    <h1>Summary Creator</h1>
 
-    {% if message %}
-    <div class="message success">{{ message }}</div>
-    {% endif %}
-
-    {% if error %}
-    <div class="message error">{{ error }}</div>
-    {% endif %}
+    <div id="success" class="message success" style="display: none;"></div>
+    <div id="error" class="message error" style="display: none;"></div>
 
     <!-- File Upload Form -->
     <form action="/upload" method="POST" enctype="multipart/form-data">
-        <label for="file">Upload your study material (PDF, DOCX, or TXT):</label>
+        <label for="file">Upload your document (PDF, DOCX, or TXT):</label>
         <input type="file" name="file" id="file" accept=".pdf,.docx,.txt" required>
         <button type="submit">Upload</button>
     </form>
@@ -93,17 +140,19 @@
     <hr>
 
     <!-- Topic Input Form -->
-    <form action="/generate" method="POST">
-        <label for="topic">Enter the topic for your study guide:</label>
+    <form onsubmit="handleFormSubmit(event)">
+        <label for="topic">Enter the topic for your summary:</label>
         <input type="text" name="topic" id="topic" required>
-        <button type="submit">Generate Study Guide</button>
+        <button type="submit">Generate Summary</button>
     </form>
 
-    {% if study_guide %}
-        <h2>Your Generated Study Guide:</h2>
-        <div id="study-guide" style="white-space: pre-wrap; background-color: #f9f9f9; padding: 20px; border-radius: 5px; margin-top: 20px;">
-            {{ study_guide | safe }}
-        </div>
-    {% endif %}
+    <div id="loading" class="loading">
+        Generating summary... Please wait.
+    </div>
+
+    <div id="summary-section" style="display: none;">
+        <h2>Your Generated Summary:</h2>
+        <div id="summary-content" class="summary"></div>
+    </div>
 </body>
 </html> 

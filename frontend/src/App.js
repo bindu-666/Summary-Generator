@@ -3,33 +3,61 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
+import Quiz from './pages/Quiz';
+import History from './pages/History';
+import Settings from './pages/Settings';
+import Home from './pages/Home';
+import PrivateRoute from './components/PrivateRoute';
 
-const App = () => {
-  const isAuthenticated = () => {
-    return localStorage.getItem('token') !== null;
-  };
-
-  const PrivateRoute = ({ children }) => {
-    return isAuthenticated() ? children : <Navigate to="/login" />;
-  };
-
+function App() {
   return (
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route
-          path="/dashboard"
+        <Route 
+          path="/" 
+          element={
+            <PrivateRoute>
+              <Home />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/dashboard" 
           element={
             <PrivateRoute>
               <Dashboard />
             </PrivateRoute>
-          }
+          } 
         />
-        <Route path="/" element={<Navigate to="/dashboard" />} />
+        <Route 
+          path="/quiz" 
+          element={
+            <PrivateRoute>
+              <Quiz />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/history" 
+          element={
+            <PrivateRoute>
+              <History />
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/settings" 
+          element={
+            <PrivateRoute>
+              <Settings />
+            </PrivateRoute>
+          } 
+        />
       </Routes>
     </Router>
   );
-};
+}
 
 export default App; 

@@ -102,9 +102,9 @@ def search_similar_documents(query, top_k=5, filter=None):
     try:
         index = get_index()
         
-        # Generate query embedding
+            # Generate query embedding
         query_embedding = model.encode(query).tolist()
-        
+            
         # Search with filter if provided
         results = index.query(
             vector=query_embedding,

@@ -15,7 +15,7 @@ import Sidebar from '../components/Sidebar';
 const Dashboard = () => {
   const [file, setFile] = useState(null);
   const [topic, setTopic] = useState('');
-  const [studyGuide, setStudyGuide] = useState('');
+  const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -62,6 +62,8 @@ const Dashboard = () => {
       if (response.data.message) {
         setSuccess(response.data.message);
         setFile(null);
+        // Dispatch event to notify sidebar of new file
+        window.dispatchEvent(new Event('fileUploaded'));
       } else {
         setError('No response message from server');
       }
@@ -73,42 +75,48 @@ const Dashboard = () => {
     }
   };
 
-  const handleGenerate = async () => {
-    if (!topic) {
-      setError('Please enter a topic');
-      return;
-    }
-
+  const handleGenerate = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSummary(null);
+    setSuccess(null);
+    
     const token = localStorage.getItem('token');
     if (!token) {
-      setError('Please log in to generate study guides');
+      setError('Please log in to generate summaries');
+      setLoading(false);
       return;
     }
-
+    
     try {
-      setLoading(true);
-      setError('');
-      setSuccess('');
-      const response = await axios.post('http://localhost:5000/generate', 
-        { topic: topic },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+        const response = await fetch('http://localhost:5000/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ topic: topic }),
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to generate summary');
         }
-      );
-      
-      if (response.data.study_guide) {
-        setStudyGuide(response.data.study_guide);
-        setSuccess('Study guide generated successfully');
-      } else {
-        setError('No study guide received from server');
-      }
+        
+        if (!data.study_guide) {
+            throw new Error('No summary received from server');
+        }
+        
+        setSummary(data.study_guide);
+        setSuccess(data.message || 'Summary generated successfully');
+        
     } catch (err) {
-      console.error('Generate error:', err);
-      setError(err.response?.data?.error || 'Error generating study guide');
+        console.error('Error generating summary:', err);
+        setError(err.message);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   };
 
@@ -129,45 +137,46 @@ const Dashboard = () => {
         <Container maxWidth="md">
           <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
             <Typography variant="h4" gutterBottom>
-              Study Guide Generator
+              Summary Generator
             </Typography>
 
             {/* File Upload Section */}
             <Box sx={{ mb: 4 }}>
               <Typography variant="h6" gutterBottom>
-                Upload Study Material
+                Upload Document
               </Typography>
-              <input
-                accept=".pdf,.docx,.txt"
-                style={{ display: 'none' }}
-                id="file-upload"
-                type="file"
-                onChange={handleFileChange}
-              />
-              <label htmlFor="file-upload">
-                <Button variant="contained" component="span" sx={{ mr: 2 }}>
-                  Choose File
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <input
+                  accept=".pdf,.docx,.txt"
+                  style={{ display: 'none' }}
+                  id="file-upload"
+                  type="file"
+                  onChange={handleFileChange}
+                />
+                <label htmlFor="file-upload">
+                  <Button variant="contained" component="span">
+                    Choose File
+                  </Button>
+                </label>
+                <Button
+                  variant="contained"
+                  onClick={handleUpload}
+                  disabled={!file || loading}
+                >
+                  Upload
                 </Button>
-              </label>
+              </Box>
               {file && (
                 <Typography variant="body2" sx={{ mt: 1 }}>
                   Selected file: {file.name}
                 </Typography>
               )}
-              <Button
-                variant="contained"
-                onClick={handleUpload}
-                disabled={!file || loading}
-                sx={{ mt: 2 }}
-              >
-                Upload
-              </Button>
             </Box>
 
             {/* Topic Input Section */}
             <Box sx={{ mb: 4 }}>
               <Typography variant="h6" gutterBottom>
-                Generate Study Guide
+                Generate Summary
               </Typography>
               <TextField
                 fullWidth
@@ -180,39 +189,42 @@ const Dashboard = () => {
                 variant="contained"
                 onClick={handleGenerate}
                 disabled={!topic || loading}
+                sx={{ mt: 2 }}
               >
-                Generate Study Guide
+                Generate Summary
               </Button>
             </Box>
 
-            {/* Status Messages */}
-            {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-              </Alert>
-            )}
-            {success && (
-              <Alert severity="success" sx={{ mb: 2 }}>
-                {success}
-              </Alert>
-            )}
-
-            {/* Loading Indicator */}
+            {/* Loading State */}
             {loading && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
                 <CircularProgress />
               </Box>
             )}
 
-            {/* Study Guide Output */}
-            {studyGuide && (
+            {/* Error Message */}
+            {error && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                {error}
+              </Alert>
+            )}
+
+            {/* Success Message */}
+            {success && (
+              <Alert severity="success" sx={{ mt: 2 }}>
+                {success}
+              </Alert>
+            )}
+
+            {/* Generated Summary */}
+            {summary && (
               <Box sx={{ mt: 4 }}>
                 <Typography variant="h6" gutterBottom>
-                  Generated Study Guide
+                  Generated Summary
                 </Typography>
-                <Paper elevation={1} sx={{ p: 2, backgroundColor: '#fff' }}>
+                <Paper elevation={1} sx={{ p: 3, backgroundColor: '#fff' }}>
                   <Typography variant="body1" style={{ whiteSpace: 'pre-wrap' }}>
-                    {studyGuide}
+                    {summary}
                   </Typography>
                 </Paper>
               </Box>

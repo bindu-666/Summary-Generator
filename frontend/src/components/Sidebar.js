@@ -12,6 +12,7 @@ import {
   Button,
   IconButton,
   Tooltip,
+  Collapse,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -22,53 +23,66 @@ import {
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   Visibility as VisibilityIcon,
+  Dashboard as DashboardIcon,
+  Description as FileIcon,
+  ExpandLess,
+  ExpandMore,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const drawerWidth = 240;
+const drawerWidth = 280; // Increased width for better file display
 
-const Sidebar = () => {
+const Sidebar = ({ open, onClose }) => {
   const navigate = useNavigate();
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [filesOpen, setFilesOpen] = useState(true);
 
   useEffect(() => {
+    // Fetch uploaded files when component mounts
     fetchUploadedFiles();
+    
+    // Set up polling to refresh files every 30 seconds
+    const interval = setInterval(fetchUploadedFiles, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchUploadedFiles = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        navigate('/login');
-        return;
-      }
-
       const response = await axios.get('http://localhost:5000/api/files', {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-
       setUploadedFiles(response.data.files);
-    } catch (err) {
-      console.error('Error fetching files:', err);
-      setError('Failed to load uploaded files');
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching files:', error);
     }
   };
 
+  // Add event listener for file upload success
+  useEffect(() => {
+    const handleFileUpload = () => {
+      fetchUploadedFiles();
+    };
+
+    window.addEventListener('fileUploaded', handleFileUpload);
+    return () => {
+      window.removeEventListener('fileUploaded', handleFileUpload);
+    };
+  }, []);
+
+  const handleQuizClick = (filename) => {
+    navigate(`/quiz/${encodeURIComponent(filename)}`);
+  };
+
   const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
+    onClose();
   };
 
   const handleNavigation = (path) => {
     navigate(path);
-    setMobileOpen(false);
+    onClose();
   };
 
   const handleLogout = () => {
@@ -76,60 +90,24 @@ const Sidebar = () => {
     navigate('/login');
   };
 
-  const handleViewFile = async (filename) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        navigate('/login');
-        return;
-      }
+  const handleViewFile = (filename) => {
+    navigate(`/view/${encodeURIComponent(filename)}`);
+  };
 
-      // Create a temporary link element
-      const link = document.createElement('a');
-      link.href = `http://localhost:5000/api/files/${filename}`;
-      link.setAttribute('download', filename);
-      
-      // Add authorization header
-      const response = await fetch(link.href, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to download file');
-      }
-      
-      // Get the blob from the response
-      const blob = await response.blob();
-      
-      // Create a URL for the blob
-      const url = window.URL.createObjectURL(blob);
-      link.href = url;
-      
-      // Append to body, click, and remove
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Clean up the URL
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Error viewing file:', err);
-      // You might want to show an error message to the user here
-    }
+  const handleFilesToggle = () => {
+    setFilesOpen(!filesOpen);
   };
 
   const menuItems = [
-    { text: 'Home', icon: <HomeIcon />, path: '/dashboard' },
-    { text: 'Upload', icon: <UploadIcon />, path: '/upload' },
+    { text: 'Home', icon: <HomeIcon />, path: '/' },
+    { text: 'Upload', icon: <UploadIcon />, path: '/dashboard' },
     { text: 'Quiz', icon: <QuizIcon />, path: '/quiz' },
     { text: 'History', icon: <HistoryIcon />, path: '/history' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
   ];
 
   const drawer = (
-    <Box sx={{ overflow: 'auto' }}>
+    <Box sx={{ overflow: 'auto', height: '100%' }}>
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Typography variant="h6" noWrap component="div">
           Study Guide
@@ -147,54 +125,48 @@ const Sidebar = () => {
         ))}
       </List>
       <Divider />
-      <Box sx={{ p: 2 }}>
-        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-          Uploaded Files
-        </Typography>
-        {loading ? (
-          <Typography variant="body2">Loading files...</Typography>
-        ) : error ? (
-          <Typography variant="body2" color="error">{error}</Typography>
-        ) : uploadedFiles.length === 0 ? (
-          <Typography variant="body2">No files uploaded yet</Typography>
-        ) : (
-          <List>
-            {uploadedFiles.map((file) => (
-              <ListItem
-                key={file.filename}
-                disablePadding
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  px: 2,
-                  py: 1,
-                }}
-              >
-                <Typography
-                  variant="body2"
-                  sx={{
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    maxWidth: '70%',
-                  }}
-                >
-                  {file.filename}
-                </Typography>
-                <Tooltip title="View file">
-                  <IconButton
-                    size="small"
-                    onClick={() => handleViewFile(file.filename)}
-                  >
-                    <VisibilityIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+      <List>
+        <ListItemButton onClick={handleFilesToggle}>
+          <ListItemIcon>
+            <FileIcon />
+          </ListItemIcon>
+          <ListItemText primary="Uploaded Files" />
+          {filesOpen ? <ExpandLess /> : <ExpandMore />}
+        </ListItemButton>
+        <Collapse in={filesOpen} timeout="auto" unmountOnExit>
+          <List component="div" disablePadding>
+            {uploadedFiles.length === 0 ? (
+              <ListItem>
+                <ListItemText 
+                  primary="No files uploaded"
+                  sx={{ pl: 4, color: 'text.secondary' }}
+                />
               </ListItem>
-            ))}
+            ) : (
+              uploadedFiles.map((file) => (
+                <ListItem 
+                  button 
+                  key={file.id}
+                  onClick={() => handleViewFile(file.filename)}
+                  sx={{ pl: 4 }}
+                >
+                  <ListItemIcon>
+                    <FileIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={file.filename}
+                    secondary={`Uploaded: ${new Date(file.upload_date).toLocaleDateString()}`}
+                    primaryTypographyProps={{
+                      noWrap: true,
+                      style: { maxWidth: '180px' }
+                    }}
+                  />
+                </ListItem>
+              ))
+            )}
           </List>
-        )}
-      </Box>
+        </Collapse>
+      </List>
       <Divider />
       <List>
         <ListItem disablePadding>
@@ -230,7 +202,7 @@ const Sidebar = () => {
       >
         <Drawer
           variant="temporary"
-          open={mobileOpen}
+          open={open}
           onClose={handleDrawerToggle}
           ModalProps={{
             keepMounted: true, // Better open performance on mobile.
@@ -252,6 +224,7 @@ const Sidebar = () => {
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
               width: drawerWidth,
+              borderRight: '1px solid rgba(0, 0, 0, 0.12)',
             },
           }}
           open
