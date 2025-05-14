@@ -7,7 +7,7 @@ from retrieval import get_index, upsert_documents, search_similar_documents, che
 from generator import generate_study_guide, generate_study_guide_from_text
 import uuid
 from routes.auth import auth_bp
-from models import db, User, File, Summary, Quiz
+from models import db
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 from functools import wraps
@@ -16,9 +16,6 @@ import datetime
 import json
 from typing import Tuple, List
 import nltk
-from flask_sqlalchemy import SQLAlchemy
-from werkzeug.utils import secure_filename
-from datetime import datetime, timedelta
 
 # Configure logging
 logging.basicConfig(
@@ -35,7 +32,7 @@ app = Flask(__name__)
 
 # Configuration
 app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'  # Change this in production
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///study_guide.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
@@ -96,21 +93,16 @@ init_db()
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = None
-        if 'Authorization' in request.headers:
-            token = request.headers['Authorization'].split(" ")[1]
-        
+        token = request.headers.get('Authorization')
         if not token:
-            return jsonify({'message': 'Token is missing!'}), 401
-        
+            return jsonify({'error': 'Token is missing'}), 401
         try:
+            token = token.split(' ')[1]  # Remove 'Bearer ' prefix
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            current_user = User.query.get(data['user_id'])
+            current_user = data
         except:
-            return jsonify({'message': 'Token is invalid!'}), 401
-        
+            return jsonify({'error': 'Token is invalid'}), 401
         return f(current_user, *args, **kwargs)
-    
     return decorated
 
 @app.route('/')
@@ -127,168 +119,207 @@ def check_index():
     except Exception as e:
         return f"Error checking index: {str(e)}"
 
-@app.route('/api/auth/signup', methods=['POST'])
+@app.route('/signup', methods=['POST'])
 def signup():
+    data = request.get_json()
+    
+    if not all(k in data for k in ('username', 'email', 'password')):
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    username = data['username']
+    email = data['email']
+    password = data['password']
+    
+    # Hash the password
+    hashed_password = generate_password_hash(password)
+    
     try:
-        data = request.get_json()
-        
-        if not all(k in data for k in ('username', 'email', 'password')):
-            return jsonify({'error': 'Missing required fields'}), 400
-        
-        # Check if user already exists
-        if User.query.filter_by(username=data['username']).first():
-            return jsonify({'error': 'Username already exists'}), 400
-            
-        if User.query.filter_by(email=data['email']).first():
-            return jsonify({'error': 'Email already exists'}), 400
-        
-        # Create new user
-        new_user = User(
-            username=data['username'],
-            email=data['email']
-        )
-        new_user.set_password(data['password'])
-        
-        # Save to database
-        db.session.add(new_user)
-        db.session.commit()
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
+                 (username, email, hashed_password))
+        conn.commit()
+        conn.close()
         
         # Generate token
         token = jwt.encode({
-            'user_id': new_user.id,
-            'username': new_user.username,
-            'email': new_user.email,
-            'exp': datetime.utcnow() + timedelta(hours=24)
+            'username': username,
+            'email': email,
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
         }, app.config['SECRET_KEY'])
         
         return jsonify({
             'message': 'User created successfully',
-            'token': token,
-            'user': {
-                'id': new_user.id,
-                'username': new_user.username,
-                'email': new_user.email
-            }
+            'token': token
         }), 201
         
+    except sqlite3.IntegrityError:
+        return jsonify({'error': 'Username or email already exists'}), 400
     except Exception as e:
-        print(f"Error in signup: {str(e)}")
-        return jsonify({'error': 'Failed to create user'}), 500
+        return jsonify({'error': str(e)}), 500
 
-@app.route('/api/auth/login', methods=['POST'])
+@app.route('/login', methods=['POST'])
 def login():
+    data = request.get_json()
+    
+    if not all(k in data for k in ('email', 'password')):
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    email = data['email']
+    password = data['password']
+    
     try:
-        data = request.get_json()
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('SELECT * FROM users WHERE email = ?', (email,))
+        user = c.fetchone()
+        conn.close()
         
-        if not all(k in data for k in ('email', 'password')):
-            return jsonify({'error': 'Missing required fields'}), 400
-        
-        # Find user by email
-        user = User.query.filter_by(email=data['email']).first()
-        
-        if user and user.check_password(data['password']):
-            # Generate token
+        if user and check_password_hash(user[3], password):
             token = jwt.encode({
-                'user_id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'exp': datetime.utcnow() + timedelta(hours=24)
+                'username': user[1],
+                'email': user[2],
+                'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24)
             }, app.config['SECRET_KEY'])
             
             return jsonify({
                 'message': 'Login successful',
-                'token': token,
-                'user': {
-                    'id': user.id,
-                    'username': user.username,
-                    'email': user.email
-                }
-            }), 200
+                'token': token
+            })
         
         return jsonify({'error': 'Invalid email or password'}), 401
         
     except Exception as e:
-        print(f"Error in login: {str(e)}")
-        return jsonify({'error': 'Failed to login'}), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/upload', methods=['POST'])
 @token_required
 def upload_file(current_user):
-    try:
+    """
+    Handle file upload and process the content.
+    """
+    logger.info("Received file upload request")
+    
     if 'file' not in request.files:
-            return jsonify({'error': 'No file part'}), 400
+        logger.error("No file provided in request")
+        return jsonify({'error': 'No file provided'}), 400
     
     file = request.files['file']
     if file.filename == '':
-            return jsonify({'error': 'No selected file'}), 400
-        
-        if file:
-            # Save file to database
-            new_file = File(
-                filename=file.filename,
-                user_id=current_user.id
-            )
-            db.session.add(new_file)
-            db.session.commit()
-
-            # Save file to filesystem
-            filename = secure_filename(file.filename)
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        logger.error("No file selected")
+        return jsonify({'error': 'No file selected'}), 400
+    
+    try:
+        # Save the file
+        filename = file.filename
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
         file.save(file_path)
-
-            return jsonify({
-                'message': 'File uploaded successfully',
-                'filename': filename
-            }), 200
-
+        logger.info(f"File saved to {file_path}")
+        
+        # Process the file and get chunks
+        chunks = process_uploaded_file(file_path)
+        logger.info(f"File processed into {len(chunks)} chunks")
+        
+        # Prepare documents for Pinecone
+        documents = []
+        for i, chunk in enumerate(chunks):
+            doc_id = f"{filename}_{i}"
+            documents.append({
+                'id': doc_id,
+                'text': chunk,
+                'metadata': {
+                    'filename': filename,
+                    'chunk_index': i,
+                    'username': current_user['username']
+                }
+            })
+        
+        # Upsert to Pinecone
+        upsert_documents(documents)
+        logger.info(f"Successfully upserted {len(documents)} chunks to Pinecone")
+        
+        # Save file info to database
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('INSERT INTO uploaded_files (username, filename) VALUES (?, ?)',
+                 (current_user['username'], filename))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'message': 'File uploaded and processed successfully',
+            'chunks': len(chunks)
+        }), 200
+    
     except Exception as e:
-        print(f"Error uploading file: {str(e)}")
-        return jsonify({'error': 'Failed to upload file'}), 500
+        logger.error(f"Error processing file: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/files', methods=['GET'])
 @token_required
-def get_files(current_user):
+def get_user_files(current_user):
+    """Get list of files uploaded by the user."""
     try:
-        files = File.query.filter_by(user_id=current_user.id).all()
-        return jsonify([{
-            'filename': file.filename,
-            'upload_date': file.upload_date.isoformat()
-        } for file in files]), 200
-
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('SELECT filename, upload_date FROM uploaded_files WHERE username = ? ORDER BY upload_date DESC',
+                 (current_user['username'],))
+        files = c.fetchall()
+        conn.close()
+        
+        return jsonify({
+            'files': [{'filename': f[0], 'upload_date': f[1]} for f in files]
+        })
     except Exception as e:
-        print(f"Error fetching files: {str(e)}")
-        return jsonify({'error': 'Failed to fetch files'}), 500
+        logger.error(f"Error getting user files: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/generate', methods=['POST'])
 @token_required
-def generate_summary(current_user):
+def generate(current_user):
+    """Generate a study guide from uploaded documents."""
     try:
         data = request.get_json()
         topic = data.get('topic')
         
         if not topic:
-            return jsonify({'error': 'Topic is required'}), 400
-
-        # Generate summary using your existing logic
-        summary_content = generate_study_guide_from_text(topic)
+            return jsonify({'error': 'No topic provided'}), 400
+            
+        # Get user's uploaded files
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('SELECT filename FROM uploaded_files WHERE username = ?', (current_user['username'],))
+        files = c.fetchall()
+        conn.close()
         
-        # Save summary to database
-        new_summary = Summary(
-            topic=topic,
-            content=summary_content,
-            user_id=current_user.id
-        )
-        db.session.add(new_summary)
-        db.session.commit()
-
+        if not files:
+            return jsonify({'error': 'No files uploaded yet'}), 400
+            
+        # Get content from all files
+        all_chunks = []
+        for file in files:
+            filename = file[0]
+            content, _ = get_file_content(filename, current_user['username'])
+            if content:
+                all_chunks.append(content)
+            
+        if not all_chunks:
+            return jsonify({'error': 'No content found in files'}), 400
+            
+        # Generate study guide
+        study_guide = generate_study_guide(topic, ' '.join(all_chunks))
+        
+        if study_guide.startswith('Error'):
+            return jsonify({'error': study_guide}), 500
+            
         return jsonify({
             'message': 'Summary generated successfully',
-            'study_guide': summary_content
-        }), 200
-
+            'study_guide': study_guide
+        })
+        
     except Exception as e:
-        print(f"Error generating summary: {str(e)}")
-        return jsonify({'error': 'Failed to generate summary'}), 500
+        logger.error(f"Error generating study guide: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/generate-from-text', methods=['POST'])
 @token_required
@@ -452,49 +483,10 @@ def extract_noun_phrases(text: str) -> List[str]:
                 noun_phrases.append(phrase)
         
         return list(set(noun_phrases))  # Remove duplicates
-        
+    
     except Exception as e:
         logger.error(f"Error extracting noun phrases: {str(e)}")
         return []
-
-@app.route('/api/history', methods=['GET'])
-@token_required
-def get_history(current_user):
-    try:
-        # Get only summaries for the current user
-        summaries = Summary.query.filter_by(user_id=current_user.id).order_by(Summary.created_at.desc()).all()
-
-        # Format summaries for the frontend
-        history = [{
-            'type': 'summary',
-            'topic': summary.topic,
-            'content': summary.content,
-            'date': summary.created_at.isoformat()
-        } for summary in summaries]
-
-        return jsonify(history), 200
-    
-    except Exception as e:
-        print(f"Error fetching history: {str(e)}")
-        return jsonify({'error': 'Failed to fetch history'}), 500
-
-@app.route('/api/check-users', methods=['GET'])
-def check_users():
-    try:
-        users = User.query.all()
-        user_list = [{
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'created_at': user.created_at.isoformat() if hasattr(user, 'created_at') else None
-        } for user in users]
-        return jsonify({
-            'count': len(user_list),
-            'users': user_list
-        }), 200
-    except Exception as e:
-        print(f"Error checking users: {str(e)}")
-        return jsonify({'error': 'Failed to check users'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True) 

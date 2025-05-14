@@ -145,32 +145,31 @@ const Dashboard = () => {
               <Typography variant="h6" gutterBottom>
                 Upload Document
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <input
-                  accept=".pdf,.docx,.txt"
-                  style={{ display: 'none' }}
-                  id="file-upload"
-                  type="file"
-                  onChange={handleFileChange}
-                />
-                <label htmlFor="file-upload">
-                  <Button variant="contained" component="span">
-                    Choose File
-                  </Button>
-                </label>
-                <Button
-                  variant="contained"
-                  onClick={handleUpload}
-                  disabled={!file || loading}
-                >
-                  Upload
+              <input
+                accept=".pdf,.docx,.txt"
+                style={{ display: 'none' }}
+                id="file-upload"
+                type="file"
+                onChange={handleFileChange}
+              />
+              <label htmlFor="file-upload">
+                <Button variant="contained" component="span" sx={{ mr: 2 }}>
+                  Choose File
                 </Button>
-              </Box>
+              </label>
               {file && (
                 <Typography variant="body2" sx={{ mt: 1 }}>
                   Selected file: {file.name}
                 </Typography>
               )}
+              <Button
+                variant="contained"
+                onClick={handleUpload}
+                disabled={!file || loading}
+                sx={{ mt: 2 }}
+              >
+                Upload
+              </Button>
             </Box>
 
             {/* Topic Input Section */}
