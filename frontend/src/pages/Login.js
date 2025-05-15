@@ -44,7 +44,7 @@ const Login = () => {
 
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
-        navigate('/dashboard');
+        navigate('/');
       } else {
         setError('No token received from server');
       }

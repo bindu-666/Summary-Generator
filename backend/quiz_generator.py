@@ -1,90 +1,139 @@
-import torch
-from transformers import T5ForConditionalGeneration, T5Tokenizer
-from nltk.tokenize import sent_tokenize
 import random
+import nltk
+from nltk.tokenize import sent_tokenize
 
 class QuizGenerator:
     def __init__(self):
-        self.model_name = "allenai/t5-small-squad2-qg"
-        self.tokenizer = T5Tokenizer.from_pretrained(self.model_name)
-        self.model = T5ForConditionalGeneration.from_pretrained(self.model_name)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model.to(self.device)
-
-    def generate_qa_pairs(self, text, num_questions=5):
-        sentences = sent_tokenize(text)
-        qa_pairs = []
-
-        while len(qa_pairs) < num_questions and sentences:
-            sentence = random.choice(sentences)
-            sentences.remove(sentence)
-
-            input_text = f"generate question: {sentence}"
-            input_ids = self.tokenizer.encode(input_text, return_tensors="pt").to(self.device)
-
-            outputs = self.model.generate(input_ids, max_length=64, num_return_sequences=1)
-            question = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-            input_text = f"generate answer: {question} context: {sentence}"
-            input_ids = self.tokenizer.encode(input_text, return_tensors="pt").to(self.device)
-
-            outputs = self.model.generate(input_ids, max_length=64, num_return_sequences=1)
-            answer = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-            qa_pairs.append({"question": question, "answer": answer})
-
-        return qa_pairs
+        # Download required NLTK data
+        try:
+            nltk.data.find('tokenizers/punkt')
+        except LookupError:
+            nltk.download('punkt')
 
     def generate_quiz(self, text, num_questions=5):
-        qa_pairs = self.generate_qa_pairs(text, num_questions)
-        quiz = []
+        """Generate a quiz from the given text."""
+        # Split text into sentences
+        sentences = sent_tokenize(text)
+        if not sentences:
+            return []
 
-        for pair in qa_pairs:
-            question = pair["question"]
-            correct_answer = pair["answer"]
+        # Generate questions
+        quiz = []
+        used_sentences = set()
+
+        # Pre-process all sentences to find important words
+        sentence_important_words = {}
+        for sentence in sentences:
+            important_words = self._find_important_words(sentence)
+            if important_words:
+                sentence_important_words[sentence] = important_words
+
+        while len(quiz) < num_questions and len(used_sentences) < len(sentences):
+            # Get a random sentence that hasn't been used
+            available_sentences = [s for s in sentences if s not in used_sentences]
+            if not available_sentences:
+                break
+
+            sentence = random.choice(available_sentences)
+            used_sentences.add(sentence)
+
+            # Get important words for this sentence
+            important_words = sentence_important_words.get(sentence, [])
+            if not important_words:
+                continue
+
+            # Choose a word to be the answer
+            answer = random.choice(important_words)
+            
+            # Create the question by replacing the answer with a blank
+            words = sentence.split()
+            answer_words = answer.split()
+            
+            # Find the starting index of the answer in the sentence
+            start_index = -1
+            for i in range(len(words) - len(answer_words) + 1):
+                if ' '.join(words[i:i + len(answer_words)]).lower() == answer.lower():
+                    start_index = i
+                    break
+            
+            if start_index == -1:
+                continue
+                
+            # Replace the answer with blank(s)
+            for i in range(len(answer_words)):
+                words[start_index + i] = "__________"
+            
+            # Remove extra blanks if they're adjacent
+            question = ' '.join(words).replace("__________ __________", "__________")
             
             # Generate incorrect options
-            incorrect_options = self.generate_incorrect_options(text, correct_answer, 3)
-            
-            options = incorrect_options + [correct_answer]
+            incorrect_options = self._generate_incorrect_options(sentence_important_words, answer)
+            if len(incorrect_options) < 3:  # Skip if we can't generate enough options
+                continue
+
+            # Combine and shuffle options
+            options = incorrect_options + [answer]
             random.shuffle(options)
 
-            quiz_item = {
+            quiz.append({
                 "question": question,
                 "options": options,
-                "correct_answer": correct_answer
-            }
-            quiz.append(quiz_item)
+                "correct_answer": answer
+            })
 
         return quiz
 
-    def generate_incorrect_options(self, text, correct_answer, num_options=3):
-        sentences = sent_tokenize(text)
-        incorrect_options = []
+    def _find_important_words(self, sentence):
+        """Find important words in a sentence that would make good quiz answers."""
+        words = sentence.split()
+        important_words = []
+        
+        # Look for capitalized words and numbers
+        for word in words:
+            # Skip very short words
+            if len(word) <= 3:
+                continue
+                
+            # Include capitalized words (likely proper nouns)
+            if word[0].isupper():
+                important_words.append(word)
+                
+            # Include numbers
+            if any(c.isdigit() for c in word):
+                important_words.append(word)
+                
+            # Include longer words (likely important terms)
+            if len(word) > 6:
+                important_words.append(word)
+        
+        return important_words
 
-        while len(incorrect_options) < num_options and sentences:
-            sentence = random.choice(sentences)
-            sentences.remove(sentence)
+    def _generate_incorrect_options(self, sentence_important_words, correct_answer, num_options=3):
+        """Generate incorrect options that are contextually relevant."""
+        # Get all important words from all sentences
+        all_important_words = []
+        for words in sentence_important_words.values():
+            all_important_words.extend(words)
 
-            input_text = f"generate wrong answer: {correct_answer} context: {sentence}"
-            input_ids = self.tokenizer.encode(input_text, return_tensors="pt").to(self.device)
+        # Remove duplicates and the correct answer (case-insensitive)
+        unique_words = [w for w in all_important_words 
+                       if w.lower() != correct_answer.lower()]
 
-            outputs = self.model.generate(input_ids, max_length=32, num_return_sequences=1)
-            wrong_answer = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        # If we don't have enough unique words, return what we have
+        if len(unique_words) < num_options:
+            return unique_words
 
-            if wrong_answer != correct_answer and wrong_answer not in incorrect_options:
-                incorrect_options.append(wrong_answer)
-
-        return incorrect_options
+        # Return random incorrect options
+        return random.sample(unique_words, num_options)
 
 # Usage example
 if __name__ == "__main__":
     quiz_gen = QuizGenerator()
     sample_text = """
-    Python is a high-level, interpreted programming language. It was created by Guido van Rossum 
-    and first released in 1991. Python's design philosophy emphasizes code readability with its 
-    notable use of significant whitespace. Its language constructs and object-oriented approach 
-    aim to help programmers write clear, logical code for small and large-scale projects.
+    The Himalayas were formed about 50 million years ago when the Indian tectonic plate collided with the Eurasian plate.
+    This massive collision created the world's highest mountain range, with Mount Everest standing at 29,029 feet above sea level.
+    The range spans five countries: India, Nepal, Bhutan, China, and Pakistan.
+    The Himalayas are home to diverse ecosystems, from tropical forests at the base to permanent snow and ice at the highest elevations.
     """
     quiz = quiz_gen.generate_quiz(sample_text)
     for i, item in enumerate(quiz, 1):

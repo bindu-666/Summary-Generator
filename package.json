@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "@radix-ui/react-label": "^2.1.6",
+    "@shadcn/ui": "^0.0.4",
+    "autoprefixer": "^10.4.21",
+    "classnames": "^2.5.1",
+    "framer-motion": "^12.11.3",
+    "lucide-react": "^0.510.0",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^4.1.6"
+  }
+}

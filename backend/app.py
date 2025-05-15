@@ -5,6 +5,7 @@ import logging
 from ingestion import process_uploaded_file
 from retrieval import get_index, upsert_documents, search_similar_documents, check_index_contents, rerank_chunks
 from generator import generate_study_guide, generate_study_guide_from_text
+from quiz_generator import QuizGenerator
 import uuid
 from routes.auth import auth_bp
 from models import db
@@ -487,6 +488,40 @@ def extract_noun_phrases(text: str) -> List[str]:
     except Exception as e:
         logger.error(f"Error extracting noun phrases: {str(e)}")
         return []
+
+@app.route('/generate-quiz', methods=['POST'])
+@token_required
+def generate_quiz(current_user):
+    """Generate a quiz from an uploaded file."""
+    try:
+        data = request.get_json()
+        filename = data.get('filename')
+        
+        if not filename:
+            return jsonify({'error': 'No filename provided'}), 400
+            
+        # Get file content
+        content, _ = get_file_content(filename, current_user['username'])
+        if not content:
+            return jsonify({'error': 'Could not read file content'}), 400
+            
+        # Initialize quiz generator
+        quiz_gen = QuizGenerator()
+        
+        # Generate quiz
+        quiz = quiz_gen.generate_quiz(content)
+        
+        # Add IDs to questions
+        for i, question in enumerate(quiz):
+            question['id'] = i + 1
+            
+        return jsonify({
+            'questions': quiz
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating quiz: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True) 

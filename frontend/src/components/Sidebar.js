@@ -91,7 +91,7 @@ const Sidebar = ({ open, onClose }) => {
   };
 
   const handleViewFile = (filename) => {
-    navigate(`/view/${encodeURIComponent(filename)}`);
+    navigate(`/file/${encodeURIComponent(filename)}`);
   };
 
   const handleFilesToggle = () => {
@@ -100,10 +100,9 @@ const Sidebar = ({ open, onClose }) => {
 
   const menuItems = [
     { text: 'Home', icon: <HomeIcon />, path: '/' },
-    { text: 'Upload', icon: <UploadIcon />, path: '/dashboard' },
+    { text: 'Upload', icon: <UploadIcon />, path: '/upload' },
+    { text: 'Generate Summary', icon: <FileIcon />, path: '/summary-generator' },
     { text: 'Quiz', icon: <QuizIcon />, path: '/quiz' },
-    { text: 'History', icon: <HistoryIcon />, path: '/history' },
-    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
   ];
 
   const drawer = (
@@ -167,6 +166,7 @@ const Sidebar = ({ open, onClose }) => {
           </List>
         </Collapse>
       </List>
+      <Box sx={{ flexGrow: 1, minHeight: '200px' }} />
       <Divider />
       <List>
         <ListItem disablePadding>

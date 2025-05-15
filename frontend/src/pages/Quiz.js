@@ -25,11 +25,15 @@ const Quiz = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [score, setScore] = useState(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    generateQuiz();
+    if (filename) {
+      generateQuiz();
+    }
   }, [filename]);
+  
 
   const generateQuiz = async () => {
     try {
@@ -50,6 +54,7 @@ const Quiz = () => {
       setQuestions(response.data.questions);
       setAnswers({});
       setScore(null);
+      setCurrentQuestionIndex(0);
     } catch (error) {
       console.error('Error generating quiz:', error);
       setError(error.response?.data?.error || 'Failed to generate quiz. Please try again.');
@@ -63,6 +68,18 @@ const Quiz = () => {
       ...prev,
       [questionId]: value
     }));
+  };
+
+  const handleNext = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
+    }
   };
 
   const handleSubmit = () => {
@@ -87,6 +104,8 @@ const Quiz = () => {
       </Box>
     );
   }
+
+  const currentQuestion = questions[currentQuestionIndex];
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -130,40 +149,69 @@ const Quiz = () => {
                   Generate New Quiz
                 </Button>
               </Box>
-            ) : (
+            ) : questions.length > 0 && currentQuestion ? (
               <Box>
-                {questions.map((question, index) => (
-                  <FormControl
-                    key={question.id}
-                    component="fieldset"
-                    sx={{ mb: 3, width: '100%' }}
+                <FormControl
+                  component="fieldset"
+                  sx={{ mb: 3, width: '100%' }}
+                >
+                  <FormLabel component="legend">
+                    Question {currentQuestionIndex + 1} of {questions.length}: {currentQuestion.question}
+                  </FormLabel>
+                  <RadioGroup
+                    value={answers[currentQuestion.id] || ''}
+                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
                   >
-                    <FormLabel component="legend">
-                      Question {index + 1}: {question.question}
-                    </FormLabel>
-                    <RadioGroup
-                      value={answers[question.id] || ''}
-                      onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-                    >
-                      {question.options.map((option, optIndex) => (
-                        <FormControlLabel
-                          key={optIndex}
-                          value={option}
-                          control={<Radio />}
-                          label={option}
-                        />
-                      ))}
-                    </RadioGroup>
-                  </FormControl>
-                ))}
+                    {currentQuestion.options.map((option, optIndex) => (
+                      <FormControlLabel
+                        key={optIndex}
+                        value={option}
+                        control={<Radio />}
+                        label={option}
+                      />
+                    ))}
+                  </RadioGroup>
+                </FormControl>
 
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+                  <Button
+                    variant="contained"
+                    onClick={handlePrevious}
+                    disabled={currentQuestionIndex === 0}
+                  >
+                    Previous
+                  </Button>
+                  
+                  {currentQuestionIndex === questions.length - 1 ? (
+                    <Button
+                      variant="contained"
+                      onClick={handleSubmit}
+                      disabled={Object.keys(answers).length !== questions.length}
+                    >
+                      Submit Quiz
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="contained"
+                      onClick={handleNext}
+                      disabled={!answers[currentQuestion.id]}
+                    >
+                      Next
+                    </Button>
+                  )}
+                </Box>
+              </Box>
+            ) : (
+              <Box sx={{ textAlign: 'center', my: 4 }}>
+                <Typography variant="h6" color="error">
+                  No questions available. Please try generating a new quiz.
+                </Typography>
                 <Button
                   variant="contained"
-                  onClick={handleSubmit}
-                  disabled={Object.keys(answers).length !== questions.length}
+                  onClick={handleNewQuiz}
                   sx={{ mt: 2 }}
                 >
-                  Submit Quiz
+                  Generate New Quiz
                 </Button>
               </Box>
             )}

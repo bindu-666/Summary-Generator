@@ -11,7 +11,7 @@ import {
 import axios from 'axios';
 import Sidebar from '../components/Sidebar';
 
-const Dashboard = () => {
+const Upload = () => {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -98,24 +98,25 @@ const Dashboard = () => {
                 type="file"
                 onChange={handleFileChange}
               />
-              <label htmlFor="file-upload">
-                <Button variant="contained" component="span" sx={{ mr: 2 }}>
-                  Choose File
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <label htmlFor="file-upload">
+                  <Button variant="contained" component="span">
+                    Choose File
+                  </Button>
+                </label>
+                <Button
+                  variant="contained"
+                  onClick={handleUpload}
+                  disabled={!file || loading}
+                >
+                  Upload
                 </Button>
-              </label>
+              </Box>
               {file && (
                 <Typography variant="body2" sx={{ mt: 1 }}>
                   Selected file: {file.name}
                 </Typography>
               )}
-              <Button
-                variant="contained"
-                onClick={handleUpload}
-                disabled={!file || loading}
-                sx={{ mt: 2 }}
-              >
-                Upload
-              </Button>
             </Box>
 
             {/* Loading State */}
@@ -145,4 +146,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard; 
+export default Upload; 

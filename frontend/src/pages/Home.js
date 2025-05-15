@@ -25,14 +25,14 @@ const Home = () => {
       title: 'Upload',
       description: 'Upload your documents to generate summaries and quizzes',
       icon: <UploadIcon sx={{ fontSize: 40 }} />,
-      path: '/dashboard',
+      path: '/upload',
       color: '#1976d2'
     },
     {
       title: 'Generate Summary',
       description: 'Create concise summaries from your uploaded documents',
       icon: <SummaryIcon sx={{ fontSize: 40 }} />,
-      path: '/dashboard',
+      path: '/summary-generator',
       color: '#2e7d32'
     },
     {
